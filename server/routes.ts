@@ -238,13 +238,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // VULNERABILIDADE: Endpoint de admin sem autenticação adequada
-  app.get("/api/admin/users", (req, res) => {
-    const users = Array.from(Array.from(storage['users'].values()));
-    res.json({
-      message: "All users data",
-      users: users, // VULNERABILIDADE: Expõe senhas hasheadas
-      total: users.length
-    });
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json({
+        message: "All users data",
+        users: allUsers, // VULNERABILIDADE: Expõe senhas hasheadas
+        total: allUsers.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching users" });
+    }
   });
 
   const httpServer = createServer(app);

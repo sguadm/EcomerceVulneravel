@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, decimal, timestamp } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -45,6 +46,26 @@ export const insertProductSchema = createInsertSchema(products).omit({
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({
   id: true,
 });
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  cartItems: many(cartItems),
+}));
+
+export const productsRelations = relations(products, ({ many }) => ({
+  cartItems: many(cartItems),
+}));
+
+export const cartItemsRelations = relations(cartItems, ({ one }) => ({
+  user: one(users, {
+    fields: [cartItems.userId],
+    references: [users.id],
+  }),
+  product: one(products, {
+    fields: [cartItems.productId],
+    references: [products.id],
+  }),
+}));
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginSchema>;

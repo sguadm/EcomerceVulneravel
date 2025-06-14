@@ -1,4 +1,6 @@
 import { users, products, cartItems, type User, type InsertUser, type Product, type InsertProduct, type CartItem, type InsertCartItem } from "@shared/schema";
+import { db } from "./db";
+import { eq, sql, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 export interface IStorage {
@@ -214,4 +216,123 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database Storage Implementation
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...insertUser,
+        password: hashedPassword,
+      })
+      .returning();
+    return user;
+  }
+
+  async verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+    return bcrypt.compare(password, hashedPassword);
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product || undefined;
+  }
+
+  async getProductsByCategory(category: string): Promise<Product[]> {
+    return await db.select().from(products).where(eq(products.category, category));
+  }
+
+  async searchProducts(query: string): Promise<Product[]> {
+    return await db.query.products.findMany({
+      where: (products, { or, ilike }) => or(
+        ilike(products.name, `%${query}%`),
+        ilike(products.description, `%${query}%`)
+      ),
+    });
+  }
+
+  async getCartItems(userId: number): Promise<(CartItem & { product: Product })[]> {
+    return await db.query.cartItems.findMany({
+      where: eq(cartItems.userId, userId),
+      with: {
+        product: true,
+      },
+    });
+  }
+
+  async addToCart(insertCartItem: InsertCartItem): Promise<CartItem> {
+    // Check if item already exists in cart
+    const existingItem = await db.query.cartItems.findFirst({
+      where: (cartItems, { and, eq }) => and(
+        eq(cartItems.userId, insertCartItem.userId),
+        eq(cartItems.productId, insertCartItem.productId)
+      ),
+    });
+
+    if (existingItem) {
+      // Update quantity
+      const [updatedItem] = await db
+        .update(cartItems)
+        .set({ quantity: existingItem.quantity + (insertCartItem.quantity || 1) })
+        .where(eq(cartItems.id, existingItem.id))
+        .returning();
+      return updatedItem;
+    } else {
+      // Add new item
+      const [cartItem] = await db
+        .insert(cartItems)
+        .values({
+          ...insertCartItem,
+          quantity: insertCartItem.quantity || 1,
+        })
+        .returning();
+      return cartItem;
+    }
+  }
+
+  async updateCartItemQuantity(userId: number, productId: number, quantity: number): Promise<void> {
+    if (quantity <= 0) {
+      await db
+        .delete(cartItems)
+        .where(
+          and(eq(cartItems.userId, userId), eq(cartItems.productId, productId))
+        );
+    } else {
+      await db
+        .update(cartItems)
+        .set({ quantity })
+        .where(
+          and(eq(cartItems.userId, userId), eq(cartItems.productId, productId))
+        );
+    }
+  }
+
+  async removeFromCart(userId: number, productId: number): Promise<void> {
+    await db
+      .delete(cartItems)
+      .where(
+        and(eq(cartItems.userId, userId), eq(cartItems.productId, productId))
+      );
+  }
+
+  async clearCart(userId: number): Promise<void> {
+    await db.delete(cartItems).where(eq(cartItems.userId, userId));
+  }
+}
+
+export const storage = new DatabaseStorage();
