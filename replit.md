@@ -15,7 +15,8 @@ Aplicação de e-commerce completa para loja de informática com vulnerabilidade
 - **Frontend**: React + TypeScript + Tailwind CSS
 - **Backend**: Express.js + JWT
 - **Autenticação**: JWT com vulnerabilidades intencionais
-- **Armazenamento**: In-memory (MemStorage)
+- **Banco de Dados**: PostgreSQL com Drizzle ORM
+- **Armazenamento**: DatabaseStorage (PostgreSQL)
 - **Roteamento**: Wouter
 
 ## Vulnerabilidades JWT Implementadas

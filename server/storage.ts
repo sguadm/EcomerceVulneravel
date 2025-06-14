@@ -9,6 +9,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   verifyPassword(password: string, hashedPassword: string): Promise<boolean>;
+  getAllUsers(): Promise<User[]>;
 
   // Product methods
   getAllProducts(): Promise<Product[]>;
@@ -132,6 +133,10 @@ export class MemStorage implements IStorage {
     return bcrypt.compare(password, hashedPassword);
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
   async getAllProducts(): Promise<Product[]> {
     return Array.from(this.products.values());
   }
@@ -242,6 +247,10 @@ export class DatabaseStorage implements IStorage {
 
   async verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
     return bcrypt.compare(password, hashedPassword);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
   }
 
   async getAllProducts(): Promise<Product[]> {
