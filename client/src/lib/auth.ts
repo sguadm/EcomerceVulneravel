@@ -14,6 +14,12 @@ export interface AuthResponse {
 export const authService = {
   async login(email: string, password: string): Promise<AuthResponse> {
     const response = await apiRequest("POST", "/api/auth/login", { email, password });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Erro no login");
+    }
+    
     const data = await response.json();
     
     // Store token in localStorage
