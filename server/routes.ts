@@ -4,9 +4,10 @@ import { storage } from "./storage";
 import { insertUserSchema, loginSchema, insertCartItemSchema } from "@shared/schema";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+// VULNERABILIDADE: Chave JWT fraca e hardcoded
+const JWT_SECRET = process.env.JWT_SECRET || "weak123";
 
-// Middleware to verify JWT token
+// VULNERABILIDADE: Middleware JWT inseguro
 function authenticateToken(req: any, res: any, next: any) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -15,9 +16,12 @@ function authenticateToken(req: any, res: any, next: any) {
     return res.status(401).json({ message: 'Access token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  // VULNERABILIDADE: Aceita algoritmo "none" 
+  jwt.verify(token, JWT_SECRET, { algorithms: ['HS256', 'none'] }, (err: any, user: any) => {
     if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
+      // VULNERABILIDADE: Log detalhado do erro JWT
+      console.log('JWT Error:', err.message, 'Token:', token);
+      return res.status(403).json({ message: 'Invalid or expired token', error: err.message });
     }
     req.user = user;
     next();
@@ -37,14 +41,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.createUser(userData);
-      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+      // VULNERABILIDADE: JWT sem expiração adequada e informações sensíveis
+      const token = jwt.sign({ 
+        userId: user.id, 
+        email: user.email, 
+        name: user.name,
+        role: 'user',
+        password: user.password // VULNERABILIDADE: Senha no JWT
+      }, JWT_SECRET, { expiresIn: '365d' }); // VULNERABILIDADE: Expiração muito longa
       
       res.json({ 
         user: { id: user.id, name: user.name, email: user.email },
         token 
       });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid user data" });
+    } catch (error: any) {
+      // VULNERABILIDADE: Exposição de detalhes do erro
+      console.log('Registration error:', error);
+      res.status(400).json({ 
+        message: "Invalid user data", 
+        error: error.message,
+        stack: error.stack 
+      });
     }
   });
 
@@ -62,14 +79,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+      // VULNERABILIDADE: JWT com informações sensíveis
+      const token = jwt.sign({ 
+        userId: user.id, 
+        email: user.email, 
+        name: user.name,
+        role: 'user',
+        password: user.password // VULNERABILIDADE: Senha no JWT
+      }, JWT_SECRET, { expiresIn: '365d' }); // VULNERABILIDADE: Expiração muito longa
       
       res.json({ 
         user: { id: user.id, name: user.name, email: user.email },
         token 
       });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid login data" });
+    } catch (error: any) {
+      // VULNERABILIDADE: Exposição de detalhes do erro
+      console.log('Login error:', error);
+      res.status(400).json({ 
+        message: "Invalid login data", 
+        error: error.message,
+        stack: error.stack 
+      });
     }
   });
 
@@ -175,6 +205,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(400).json({ message: "Failed to clear cart" });
     }
+  });
+
+  // VULNERABILIDADE: Endpoint para debug JWT (expõe informações sensíveis)
+  app.get("/api/debug/jwt", (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.json({ message: "No token provided", secret: JWT_SECRET });
+    }
+
+    try {
+      // VULNERABILIDADE: Decodifica JWT sem verificação
+      const decoded = jwt.decode(token, { complete: true });
+      res.json({
+        message: "JWT Debug Info",
+        secret: JWT_SECRET,
+        token: token,
+        decoded: decoded,
+        header: decoded?.header,
+        payload: decoded?.payload
+      });
+    } catch (error: any) {
+      res.json({
+        message: "JWT Decode Error",
+        secret: JWT_SECRET,
+        token: token,
+        error: error.message
+      });
+    }
+  });
+
+  // VULNERABILIDADE: Endpoint de admin sem autenticação adequada
+  app.get("/api/admin/users", (req, res) => {
+    const users = Array.from(Array.from(storage['users'].values()));
+    res.json({
+      message: "All users data",
+      users: users, // VULNERABILIDADE: Expõe senhas hasheadas
+      total: users.length
+    });
   });
 
   const httpServer = createServer(app);

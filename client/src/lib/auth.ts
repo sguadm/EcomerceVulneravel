@@ -25,6 +25,12 @@ export const authService = {
 
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
     const response = await apiRequest("POST", "/api/auth/register", { name, email, password });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Erro no registro");
+    }
+    
     const data = await response.json();
     
     // Store token in localStorage

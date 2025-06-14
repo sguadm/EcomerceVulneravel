@@ -169,13 +169,13 @@ export class MemStorage implements IStorage {
 
     if (existingItem) {
       // Update quantity
-      existingItem.quantity += insertCartItem.quantity;
+      existingItem.quantity += insertCartItem.quantity || 1;
       this.cartItems.set(existingItem.id, existingItem);
       return existingItem;
     } else {
       // Add new item
       const id = this.cartIdCounter++;
-      const cartItem: CartItem = { ...insertCartItem, id };
+      const cartItem: CartItem = { ...insertCartItem, quantity: insertCartItem.quantity || 1, id };
       this.cartItems.set(id, cartItem);
       return cartItem;
     }
