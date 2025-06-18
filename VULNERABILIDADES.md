@@ -9,7 +9,7 @@ Aplicação de e-commerce completa para loja de informática com vulnerabilidade
 - Carrinho de compras com funcionalidades completas
 - Busca e filtros por categoria e preço
 - Interface responsiva moderna
-- Armazenamento em memória com produtos de exemplo
+- Banco de dados PostgreSQL com produtos persistentes
 
 ## Arquitetura
 - **Frontend**: React + TypeScript + Tailwind CSS
